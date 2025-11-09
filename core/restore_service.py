@@ -51,17 +51,29 @@ class RestoreService:
     def build_restored_filename(self, file_path: str) -> str:
         # build_restored_filename: given the obscured file path, return the output path
         # using:
-        #   - If file name starts with "Obscured_", replace that prefix with "Restored_"
+        #   - If the basename stem starts with "Obscured_", replace that with "Restored_"
         #   - Else prepend "Restored_"
+        #   - For .csv  -> keep .csv
+        #   - For .docx -> keep .docx
+        #   - Else      -> use .txt
         directory, name = os.path.split(file_path)
+        stem, ext = os.path.splitext(name)
+        ext = ext.lower()
 
-        if name.startswith("Obscured_"):
-            # Replace "Obscured_" with "Restored_"
-            rest = name[len("Obscured_"):]
-            restored_name = f"Restored_{rest}"
+        if stem.startswith("Obscured_"):
+            rest = stem[len("Obscured_"):]
+            new_stem = f"Restored_{rest}"
         else:
-            restored_name = f"Restored_{name}"
+            new_stem = f"Restored_{stem}"
 
+        if ext == ".csv":
+            out_ext = ".csv"
+        elif ext == ".docx":
+            out_ext = ".docx"
+        else:
+            out_ext = ".txt"
+
+        restored_name = new_stem + out_ext
         return os.path.join(directory, restored_name)
         # build_restored_filename  # RestoreService.build_restored_filename
 

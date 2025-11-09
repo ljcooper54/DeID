@@ -12,8 +12,7 @@ from . import text_utils, hash_utils
 class ObscureService:
     # ObscureService: end-to-end anonymization pipeline for a project.
     # Detects sensitive entities, merges with user/project forced names, assigns pseudonyms,
-    # applies replacements, logs history, and generates consistent output filenames
-    # using "Obscured_<originalname>".
+    # applies replacements, logs history, and generates consistent output filenames.
 
     def __init__(self,
                  detector: EntityDetector,
@@ -197,9 +196,22 @@ class ObscureService:
 
     def build_obscured_filename(self, file_path: str) -> str:
         # build_obscured_filename: for an input path, return the output path
-        # using the rule "Obscured_<original_filename>" in the same directory.
+        # using:
+        #   - For .csv  -> Obscured_<stem>.csv
+        #   - For .docx -> Obscured_<stem>.docx
+        #   - Else      -> Obscured_<stem>.txt
         directory, name = os.path.split(file_path)
-        obscured_name = f"Obscured_{name}"
+        stem, ext = os.path.splitext(name)
+        ext = ext.lower()
+
+        if ext == ".csv":
+            out_ext = ".csv"
+        elif ext == ".docx":
+            out_ext = ".docx"
+        else:
+            out_ext = ".txt"
+
+        obscured_name = f"Obscured_{stem}{out_ext}"
         return os.path.join(directory, obscured_name)
         # build_obscured_filename  # ObscureService.build_obscured_filename
 
