@@ -146,7 +146,7 @@ class AppController:
         _, ext = os.path.splitext(filepath)
         ext = ext.lower()
 
-        if ext == ".txt":
+        if ext == ".txt" or ext == ".csv":
             with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                 return f.read()
 
@@ -195,22 +195,46 @@ class AppController:
     def _write_obscured_output(self,
                                source_path: str,
                                obscured_text: str) -> str:
-        # _write_obscured_output: write obscured text to "Obscured_<original-filename>"
-        # in the same directory as `source_path`.
+        # _write_obscured_output: write obscured text to an output path determined
+        # by ObscureService.build_obscured_filename(). For .docx, we create a new
+        # DOCX with one paragraph per line; for .csv and others, we write plain text.
         outpath = self.obscurer.build_obscured_filename(source_path)
-        with open(outpath, "w", encoding="utf-8") as f:
-            f.write(obscured_text)
+        _, ext = os.path.splitext(source_path)
+        ext = ext.lower()
+
+        if ext == ".docx":
+            doc = DocxDocument()
+            for line in obscured_text.splitlines():
+                doc.add_paragraph(line)
+            # end for
+            doc.save(outpath)
+        else:
+            with open(outpath, "w", encoding="utf-8") as f:
+                f.write(obscured_text)
+
         return outpath
         # _write_obscured_output  # AppController._write_obscured_output
 
     def _write_restored_output(self,
                                source_path: str,
                                restored_text: str) -> str:
-        # _write_restored_output: write restored text to "Restored_<...>" filename
-        # in the same directory as `source_path`.
+        # _write_restored_output: write restored text to an output path determined
+        # by RestoreService.build_restored_filename(). For .docx, create a new DOCX
+        # with one paragraph per line; for .csv and others, write plain text.
         outpath = self.restorer.build_restored_filename(source_path)
-        with open(outpath, "w", encoding="utf-8") as f:
-            f.write(restored_text)
+        _, ext = os.path.splitext(source_path)
+        ext = ext.lower()
+
+        if ext == ".docx":
+            doc = DocxDocument()
+            for line in restored_text.splitlines():
+                doc.add_paragraph(line)
+            # end for
+            doc.save(outpath)
+        else:
+            with open(outpath, "w", encoding="utf-8") as f:
+                f.write(restored_text)
+
         return outpath
         # _write_restored_output  # AppController._write_restored_output
 
@@ -220,7 +244,7 @@ class AppController:
 
     def obscure_files(self, file_paths: List[str]) -> List[str]:
         # obscure_files: run anonymization on one or more files under the active project,
-        # write Obscured_* outputs, and update project_file rows with the obscured path + timestamp.
+        # write outputs with type-aware names (csv/docx/tx), and update project_file rows.
         if self._current_project_id is None:
             raise RuntimeError("No active project.")
 
@@ -237,7 +261,7 @@ class AppController:
                 text=text
             )
 
-            # write output file using Obscured_ naming
+            # write output file using naming rules
             out_path = self._write_obscured_output(filepath, out_result.obscured_text)
             outpaths.append(out_path)
 
@@ -254,16 +278,16 @@ class AppController:
         # obscure_files  # AppController.obscure_files
 
     def restore_files(self, file_paths: List[str]) -> List[str]:
-        # restore_files: run de-anonymization on one or more obscured text files
-        # under the active project, and save as Restored_*.
+        # restore_files: run de-anonymization on one or more obscured files
+        # under the active project, and save as Restored_* with appropriate extension.
         if self._current_project_id is None:
             raise RuntimeError("No active project.")
 
         outpaths: List[str] = []
 
         for filepath in file_paths:
-            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                obscured_text = f.read()
+            # Load text using the same loader (handles .docx, .csv, etc.)
+            obscured_text = self._load_file_as_text(filepath)
 
             res = self.restorer.restore_text(self._current_project_id, obscured_text)
 
